@@ -20,7 +20,7 @@ def main(img):
     if hlines:
 
         # regio of intrehsl hsv machine learning st polylines
-        cv2.polylines(original, vertex, 1, (0,255,0), 2)
+        cv2.polylines(original, vertex, 1, (0,255,255), 2)
 
         # vertical line
         cv2.line(original, (math.ceil(original.shape[1] * 0.5), 0), (math.ceil(original.shape[1] * 0.5), original.shape[0]), (0, 255, 0), 3)
@@ -28,8 +28,55 @@ def main(img):
         # horizontal line
         cv2.line(original, (0, math.ceil(original.shape[0] * 0.5)), (original.shape[1], math.ceil(original.shape[0] * 0.5)), (0, 255, 0), 3)
 
+        angles = [[-25, 60, 660],
+                  [-55, 60, 660],
+                  [-125, 1220, 660],
+                  [-155, 1220, 660]] 
+
+        max_width = img.shape[1]
+        max_height = img.shape[0] - 60
+
+        for angle in angles:
+
+            cangle = angle[0]
+            length = 700
+
+            p1_x = angle[1]
+            p1_y = angle[2]
+            
+            theta = cangle * math.pi / 180
+
+            p2_x = round(p1_x + length * math.cos(cangle * math.pi / 180))
+            p2_y = round(p1_y + length * math.sin(cangle * math.pi / 180))
+
+            cv2.line(original, (int(p1_x), int(p1_y)), (int(p2_x), int(p2_y)), (0, 0, 255), 3)
+            cv2.circle(original, (p1_x, p1_y), 4, (0,10,0), 4)
+            cv2.circle(original, (p2_x, p2_y), 4, (255,0,), 4)
+
+
+##        angles = [[25], [75], [105], [155]] 
+##
+##        max_width = img.shape[1]
+##        max_height = img.shape[0] - 60
+##        bottom_width = 580
+##
+##        angle = 25
+##        length = 1280
+##        p1_x = (max_width / 2) - bottom_width
+##        p1_y = max_height
+##
+##        theta = angle * math.pi / 180
+##
+##        p2_x = round(p1_x + length * math.cos(angle * math.pi / 180))
+##        p2_y = round(p2_y + length * math.cos(angle * math.pi / 180))
+##
+##        cv2.line(original, (line[0], line[1]), (line[2], line[3]), (0, 0, 0), 3)
+
+
     # 
     img = getRegion(img, vertex)
+
+    #cv2.imshow("Regio", img)
 
     # convert bgr2gray
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -52,7 +99,7 @@ def main(img):
     edges = np.dstack((img, img, img))
     test = cv2.addWeighted(edges, 2, original, 1, 0)
 
-    #cv2.imshow("Image", img)
+    #cv2.imshow("Image", test)
 
     drawLines(img, original)
 
@@ -82,27 +129,30 @@ def cvtYellow(img):
 def computeROI(img):
 
         top_width = 180
-        bottom_width = 180
+        bottom_width = 580
     
-        top_width = (top_width / 2) + 55
-        bottom_width = (bottom_width / 2)
+        top_width = (top_width / 2) + 30
+        #bottom_width = (bottom_width / 2)
 
         max_width = img.shape[1]
         max_height = img.shape[0] - 60
 
-        print(max_width)
-        print(max_height)
-        
-        width_delta = int(max_width/10)
+        width_delta = int(max_width/16)
 
-        bottom_left = (bottom_width, max_height)
-        bottom_right = (max_width - bottom_width, max_height)
-        
-        top_right = (max_width / 2 + width_delta, max_height / 2 + top_width)
-        top_left = (max_width / 2 - width_delta, max_height / 2 + top_width)
+        bottom_left = ((max_width / 2) - bottom_width, max_height)
+        bottom_right = ((max_width / 2) + bottom_width, max_height)
+
+        top_left = ((max_width / 2) - bottom_width, max_height - 230)
+        top_right = ((max_width / 2) + bottom_width, max_height - 230)
+
+        #top_left = (max_width / 2 - width_delta, max_height / 2 + top_width)
+        #top_right = (max_width / 2 + width_delta, max_height / 2 + top_width)
+
+        #print(bottom_left)
+        #print(bottom_right)
 
         array = np.array([[bottom_left, bottom_right, top_right, top_left]], np.int32)
-
+        
         return array
 
 def getRegion(img, vertex):
@@ -117,16 +167,17 @@ def getRegion(img, vertex):
 
     cv2.fillPoly(mask, vertex, ignore_mask_color)
 
+
     return cv2.bitwise_and(img, mask)
 
 
 def houghLines(img):
 
-    rho = 2
+    rho = 0.8
     theta = np.pi / 180
-    thres = 10
-    min_line_length = 10
-    max_line_gap = 80
+    thres = 25
+    min_line_length = 50
+    max_line_gap = 200
 
     hough = cv2.HoughLinesP(img, rho, theta, thres, np.array([]), minLineLength=min_line_length, maxLineGap=max_line_gap)
 
@@ -134,38 +185,7 @@ def houghLines(img):
         return []
     else:
         return hough
-
-
-def arcTan2(y, x):
-
-    if y == 0.0:
-        return 0.0
-    elif x == 0.0:
-        return 90.0
-
-    a = min(math.fabs(x), math.fabs(y)) / min(math.fabs(x), math.fabs(y))
-    s = (a * a)
-
-    angle = ((-0.0464964749 * s + 0.15931422) * s - 0.327622764) * s * a + a
-
-    #print(s)
-
-    if math.fabs(y) > math.fabs(x):
-        angle = (math.pi / 2)
-
-    if x < 0:
-        angle = math.pi - angle
-        
-    if y < 0:
-        angle *= - 1.0
-
-    angle *= math.pi / 180
-
-    if angle < 0:
-        angle += 180
-        
-    return angle
-
+    
 def evaluateLine(line, img, original):
     
     lines = houghLines(img)
@@ -193,26 +213,25 @@ def evaluateLine(line, img, original):
             y = (y1 + y2) / 2
 
             center = (x, y)
-
-            #if y < 280:
-            #   break
-
-            #ngle = arcTan2((y2 - y1), (x2 - x1))
             angle = math.atan2((y2 - y1), (x2 - x1)) * 180 / math.pi
+
+
 
             if math.fabs(angle) <= 10:
                 continue
             
             if x == 0:
-                dx = 1
+                qqdx = 1
+
+            dx = (x2 - x1)
+            dy = (y2 - y1)
+
+            k = dy / dx
+            b = y1 - k * x1
 
             if x2 == x1:
                 continue
 
-            #print("angle = " + str(angle))
-
-            #print(angle)
- 
             if angle < 0.0:
                 angle += 180
 
@@ -226,7 +245,9 @@ def evaluateLine(line, img, original):
             #x_max = x2
             #y_max = y2
 
-            lines_list.append((line, angle, center))
+            #print("angle = " + str(angle))
+    
+            lines_list.append((line, angle, center, x, b))
             
     except TypeError:
         print("Type Error")
@@ -248,44 +269,59 @@ def drawLines(img, original):
 
     for line in lines:
 
-        evaluatedLine = evaluateLine(line, img, original)
+        gradient, intercept = np.polyfit((line[0][0], line[0][1]), (line[0][2], line[0][3]), 1)
+
+        print(gradient)
+
+    for line in lines:
+
+        #evaluatedLine = evaluateLine(line, img, original)
         
-        for eLItem in evaluatedLine:
+        for eLItem in evaluateLine(line, img, original):
             
             (x, y) = eLItem[2]
             angle = eLItem[1]
 
-            if x < img.shape[1] * 0.5 and angle >= 25 and angle <= 75:
-                leftLines.append(eLItem)
-                #print("left: " + str(angle))
-                
-            if x > img.shape[1] * 0.5and angle >= 105 and angle <= 155:
-                rightLines.append(eLItem)
-                #print("right: " + str(angle))
+            #print("angle = " + str(angle))
 
+            # eliminate lines
+            if x < img.shape[1] * 0.5 and angle >= 25 and angle <= 55:
+                leftLines.append(eLItem)
+            #else:
+            #    print(angle)
+
+            
+            if x > img.shape[1] * 0.5and angle >= 125 and angle <= 155:
+                rightLines.append(eLItem)
+            #else:
+                #print(angle)
 
     for ll in leftLines:
         line = ll[0][0]
-        cv2.line(original, (line[0], line[1]), (line[2], line[3]), (0, 0, 0), 3)
+        center = ll[2]
+        
+        cv2.line(original, (line[0], line[1]), (line[2], line[3]), (255, 255, 255), 1)
 
 
     for rl in rightLines:
         line = rl[0][0]
-        cv2.line(original, (line[0], line[1]), (line[2], line[3]), (0, 0, 0), 3)
+        center = ll[2]
+        
+        cv2.line(original, (line[0], line[1]), (line[2], line[3]), (255, 255, 255), 1)
 
 
-   # processLine(rightLines, original, True)
-    #processLine(leftLines, original, False)
-    
+##    processLine(rightLines, original, True)
+##    processLine(leftLines, original, False)
+
       
-    for ll in leftLines:
-        for rl in rightLines:
-
-            ll_x, ll_y = ll[2]            
-            #cv2.circle(original, (math.ceil(ll_x), math.ceil(ll_y)), 4, (255,0,0), 4)
-
-            rl_x, rl_y = rl[2]
-            #cv2.circle(original, (math.ceil(rl_x), math.ceil(rl_y)), 4, (0,0,255), 2)
+##    for ll in leftLines:
+##        for rl in rightLines:
+##
+##            ll_x, ll_y = ll[2]            
+##            cv2.circle(original, (math.ceil(ll_x), math.ceil(ll_y)), 4, (255,0,0), 4)
+##
+##            rl_x, rl_y = rl[2]
+##            cv2.circle(original, (math.ceil(rl_x), math.ceil(rl_y)), 4, (0,0,255), 2)
 
 
 def processLine(lane, img, right):
@@ -316,7 +352,7 @@ if __name__ == "__main__":
     content_type = "video"
 
     if content_type == "image":
-        img = cv2.imread("image/test.jpg", 1)
+        img = cv2.imread("image/test1.jpg", 1)
         img = cv2.resize(img, (1280,720))
         
         main(img)
