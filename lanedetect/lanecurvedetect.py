@@ -7,16 +7,17 @@ import csv
 import random
 
 hlines = False
+debugging = False
 
 def main(img):
     
     original = img
 
     # convert yellow colors to white
-    img = cvtYellow(img)
+    img = cvt_yellow(img)
 
     # compute region of intrest
-    vertex = computeROI(img)
+    vertex = compute_roi(img)
 
     if hlines:
 
@@ -53,7 +54,7 @@ def main(img):
             cv2.line(original, (int(p1_x), int(p1_y)), (int(p2_x), int(p2_y)), (0, 0, 255), 3)
             cv2.circle(original, (p2_x, p2_y), 4, (255,0,), 4)
     # 
-    img = getRegion(img, vertex)
+    img = get_region(img, vertex)
 
     # convert bgr2gray
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -72,11 +73,12 @@ def main(img):
     edges = np.dstack((img, img, img))
     test = cv2.addWeighted(edges, 2, original, 1, 0)
 
-    drawLines(img, original)
+    draw_lines(img, original)
 
+    #1280x720
     cv2.imshow("Original", original)
 
-def cvtYellow(img):
+def cvt_yellow(img):
     
     hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
 
@@ -97,7 +99,7 @@ def cvtYellow(img):
 
     return result
 
-def computeROI(img):
+def compute_roi(img):
 
         top_width = 180
         bottom_width = 580
@@ -126,7 +128,7 @@ def computeROI(img):
         
         return array
 
-def getRegion(img, vertex):
+def get_region(img, vertex):
 
     mask = np.zeros_like(img)
     
@@ -142,7 +144,7 @@ def getRegion(img, vertex):
     return cv2.bitwise_and(img, mask)
 
 
-def houghLines(img):
+def hough_lines(img):
 
     rho = 0.8
     theta = np.pi / 180
@@ -153,22 +155,21 @@ def houghLines(img):
     hough = cv2.HoughLinesP(img, rho, theta, thres, np.array([]), minLineLength=min_line_length, maxLineGap=max_line_gap)
 
     if(hough is None or len(hough) > 500):
-        return []
+        return [0,0,0,0]
     else:
         return hough
     
-def evaluateLine(line, img, original):
+def evaluate_line(line, img, original):
     
-    lines = houghLines(img)
+    lines = hough_lines(img)
+
+    # black
     lines_original = np.zeros(img.shape, dtype=np.uint8)
-    line_width = 2
 
     width = img.shape[0]
     height = img.shape[1]
     
     lines_list = []
-
-    color = (0, 0, 255)
     
     try:
         
@@ -177,21 +178,11 @@ def evaluateLine(line, img, original):
             old_x = (x1 + x2) / 2
             old_y = (y1 + y2) / 2
 
-            #print("x = " + str(old_x))
-            #print("y = " + str(old_y))
-
-        
-            #print(line)
-
             y1 = -(y1 - height) 
             y2 = -(y2 - height) 
             
             x = (x1 + x2) / 2
             y = (y1 + y2) / 2
-
-            #print(str(old_x) + " = > " + str(old_y))
-
-            #cv2.circle(original, (int(x), int(y)), 4, (255,0,0), 4)
 
             center = (int(old_x), int(old_y))
             angle = math.atan2((y2 - y1), (x2 - x1)) * 180 / math.pi
@@ -202,12 +193,6 @@ def evaluateLine(line, img, original):
             if x == 0:
                 x = 1
 
-            dx = (x2 - x1)
-            dy = (y2 - y1)
-
-            k = dy / dx
-            b = y1 - k * x1
-
             if x2 == x1:
                 continue
 
@@ -217,97 +202,162 @@ def evaluateLine(line, img, original):
             current_slope = (y2 - y1) / (x2 - x1)
             intercept = y1 - current_slope * x1
     
-            lines_list.append([line, angle, center, current_slope, intercept])
+            lines_list.append([line, angle, center])
             
     except TypeError as e:
-        print("Type Error = " + str(e))
+        print_value("Type Error = ", e)
 
     return lines_list
 
-def getSlope(x1, y1, x2, y2):
+def get_slope(x1, y1, x2, y2):
 
     slope = (y2 - y1) / (x2 - x1)
     intercept = y1 - current_slope * x1
 
     return slope, intercept
 
-def extrapolateSlope()
-    
+def print_value(key, value):
+    if debugging:
+        print(key, str(value))
 
-def drawLines(img, original):
+def draw_lines(img, original):
 
-    lines = houghLines(img)
-    lines_original = np.zeros(img.shape, dtype=np.uint8)
+    lines = hough_lines(img)
+    lines_original = np.zeros((*img.shape, 3), dtype=np.uint8)
     line_width = 2
 
-    color = (0, 0, 255)
+    ymin = img.shape[0]
+    ymax = img.shape[0]
+
+    data = dict()
 
     # sortlines
-    leftLines = []
-    rightLines = []
+    left_lines = []
+    right_lines = []
 
-    leftSlope = []
-    rightSlope = []
+    all_left_grad = []
+    all_left_y = []
+    all_left_x = []
+
+    all_right_grad = []
+    all_right_y = []
+    all_right_x = []
 
     for line in lines:
+        for eval_item in evaluate_line(line, img, original):
+            
+            (x, y) = eval_item[2]
+            angle = eval_item[1]
+            coor = eval_item[0][0]
 
-        for eLItem in evaluateLine(line, img, original):
-            
-            (x, y) = eLItem[2]
-            angle = eLItem[1]
-            
+            x1 = coor[0]
+            y1 = coor[1]
+            x2 = coor[2]
+            y2 = coor[3]
+
+            ymin = min(min(y1, y2), ymin)
+            gradient, intercept = np.polyfit((x1, x2), (y1, y2), 1)
+
             # eliminate lines
-            if x < img.shape[1] * 0.5 and angle >= 25 and angle <= 55:
+            if x < img.shape[1] * 0.5 and angle >= 25 and angle <= 55 and gradient < 0:
 
-                slope = eLItem[3]
-                intercept = eLItem[4]
+                left_lines.append(eval_item)
 
-                leftSlope.append((slope, intercept))
-                leftLines.append(eLItem)
+                all_left_grad += [gradient]
+                all_left_y += [y1, y2]
+                all_left_x += [x1, x2]
             
-            if x > img.shape[1] * 0.5 and angle >= 125 and angle <= 155:
-                
-                slope = eLItem[3]
-                intercept = eLItem[4]
+            if x > img.shape[1] * 0.5 and angle >= 125 and angle <= 155 and gradient > 0:
 
-                rightSlope.append((slope, intercept))
-                rightLines.append(eLItem)
+                right_lines.append(eval_item)
 
-    print(leftSlope)
-    print(rightSlope)
+                all_right_grad += [gradient]
+                all_right_y += [y1, y2]
+                all_right_x += [x1, x2]
 
-    for ll in leftLines:
-        line = ll[0][0]
-        center = ll[2]
-        slope = ll[3]
-        intercept = ll[4]
+    left_mean_grad = np.mean(all_left_grad)
+    left_y_mean = np.mean(all_left_y)
+    left_x_mean = np.mean(all_left_x)
+    left_intercept = left_y_mean - (left_mean_grad * left_x_mean)
 
-        leftSlope.append((slope, intercept))
+    print_value("all line grad = ", gradient)
+    right_mean_grad = np.mean(all_right_grad)
+    right_y_mean = np.mean(all_right_y)
+    right_x_mean = np.mean(all_right_x)
+    right_intercept = right_y_mean - (right_mean_grad * right_x_mean)
 
-        #print(center)
+    if len(all_left_grad) > 0 and len(all_right_grad) > 0:
 
-        b = random.randint(0,255)
-        g = random.randint(0,255)
-        r = random.randint(0,255)
+        upper_left_x = int((ymin - left_intercept) / left_mean_grad)
+        lower_left_x = int((ymax - left_intercept) / left_mean_grad)
+
+        upper_right_x = int((ymin - right_intercept) / right_mean_grad)
+        lower_right_x = int((ymax - right_intercept) / right_mean_grad)
+
+        p1_center_x = int((upper_left_x + upper_right_x) / 2)
+        p2_center_x = int((lower_left_x + lower_right_x) / 2)
+
+        angle = math.atan2((p1_center_x - ymin), (p2_center_x - ymax)) * 180 / math.pi
+
+        print("Deviation: " + str(-float(angle - 90)))
+
+        tl = (upper_right_x, ymin)
+        tr = (upper_left_x, ymin)
+        br = (lower_left_x, ymax)
+        bl = (lower_right_x, ymax)
+
+        cv2.fillPoly(original, np.array([[tl, tr, br, bl]], np.int32), (0,255,0))
+        cv2.line(original, (upper_left_x, ymin), (lower_left_x, ymax), (0, 0, 255), 4)
+        cv2.line(original, (upper_right_x, ymin), (lower_right_x, ymax), (0, 0, 255), 4)
+        cv2.line(original, (p1_center_x, ymin), (p2_center_x, ymax), (0, 0, 255), 2)
+
+        (transform, w, h) = transform_lane(tl, tr, br, bl)
+
+        warped = cv2.warpPerspective(original, transform, (w,h))
+
+        cv2.imshow("Warped", warped)
         
-        cv2.line(original, (line[0], line[1]), (line[2], line[3]), (b, g, r), 2)
-        cv2.circle(original, (center), 4, (b,g,r), 4)
 
+def order_pts(pts):
 
-    for rl in rightLines:
-        line = rl[0][0]
-        center = rl[2]
-        slope = ll[3]
-        intercept = ll[4]
-        
-        #print(center)
+    rect = np.zeros((4,2), dtype = "float32")
 
-        b = random.randint(0,255)
-        g = random.randint(0,255)
-        r = random.randint(0,255)
-        
-        cv2.line(original, (line[0], line[1]), (line[2], line[3]), (b, g, r), 2)
-        cv2.circle(original, (center), 4, (b,g,r), 4)
+    s = pts.sum(axis = 1)
+    rect[0] = pts[np.argmin(s)]
+    rect[2] = pts[np.argmin(s)]
+
+    diff = np.diff(pts, axis = 1)
+    rect[1] = pts[np.argmin(s)]
+    rect[3] = pts[np.argmin(s)]
+
+    return rect
+
+def transform_lane(tl, tr, br, bl):
+
+    rect = np.array([tl, tr, br, bl], dtype= "float32")
+
+    (tl, tr, br, bl) = rect
+
+    w1 = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+    w2 = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+    maxWidth = max(int(w1), int(w2))
+    
+    h1 = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
+    h2 = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+    maxHeight = max(int(h1), int(h2))
+
+    dst = np.array([
+        [0, 0],
+        [maxWidth - 1, 0],
+        [maxWidth - 1, maxHeight - 1],
+        [0, maxHeight - 1]], dtype = "float32")
+
+    print(dst)
+    
+    transform = cv2.getPerspectiveTransform(rect, dst)
+
+    return transform, maxWidth, maxHeight
+    
 
 if __name__ == "__main__":
 
@@ -331,9 +381,6 @@ if __name__ == "__main__":
         while(capture.isOpened()):
 
             ret, img = capture.read()
-            #img = cv2.resize(img, (1280, 720))
-
-            #cv2.imshow("Video", img)
 
             main(img)
 
